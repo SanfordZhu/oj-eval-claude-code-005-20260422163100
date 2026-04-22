@@ -173,11 +173,13 @@ bool QoiDecode(uint32_t &width, uint32_t &height, uint8_t &channels, uint8_t &co
 
     uint8_t r, g, b, a;
     a = 255u;
+    uint8_t pre_r = 0u, pre_g = 0u, pre_b = 0u, pre_a = 255u;
 
     for (int i = 0; i < px_num; ++i) {
 
         // decode next pixel
         if (run > 0) {
+            r = pre_r; g = pre_g; b = pre_b; a = pre_a;
             run--;
         } else {
             uint8_t tag = QoiReadU8();
@@ -185,6 +187,7 @@ bool QoiDecode(uint32_t &width, uint32_t &height, uint8_t &channels, uint8_t &co
                 r = QoiReadU8();
                 g = QoiReadU8();
                 b = QoiReadU8();
+                a = pre_a;
             } else if (tag == QOI_OP_RGBA_TAG) {
                 r = QoiReadU8();
                 g = QoiReadU8();
@@ -199,19 +202,23 @@ bool QoiDecode(uint32_t &width, uint32_t &height, uint8_t &channels, uint8_t &co
                     int dr = ((tag >> 4) & 0x03) - 2;
                     int dg = ((tag >> 2) & 0x03) - 2;
                     int db = (tag & 0x03) - 2;
-                    r = static_cast<uint8_t>(r + dr);
-                    g = static_cast<uint8_t>(g + dg);
-                    b = static_cast<uint8_t>(b + db);
+                    r = static_cast<uint8_t>(pre_r + dr);
+                    g = static_cast<uint8_t>(pre_g + dg);
+                    b = static_cast<uint8_t>(pre_b + db);
+                    a = pre_a;
                 } else if (tag2 == QOI_OP_LUMA_TAG) {
                     int dg = (tag & 0x3f) - 32;
                     uint8_t b2 = QoiReadU8();
                     int dr_dg = ((b2 >> 4) & 0x0f) - 8;
                     int db_dg = (b2 & 0x0f) - 8;
-                    r = static_cast<uint8_t>(r + dg + dr_dg);
-                    b = static_cast<uint8_t>(b + dg + db_dg);
-                    g = static_cast<uint8_t>(g + dg);
+                    r = static_cast<uint8_t>(pre_r + dg + dr_dg);
+                    g = static_cast<uint8_t>(pre_g + dg);
+                    b = static_cast<uint8_t>(pre_b + dg + db_dg);
+                    a = pre_a;
                 } else if (tag2 == QOI_OP_RUN_TAG) {
                     run = (tag & 0x3f) + 1;
+                    r = pre_r; g = pre_g; b = pre_b; a = pre_a;
+                    run--; // emit one pixel now
                 }
             }
         }
@@ -223,6 +230,8 @@ bool QoiDecode(uint32_t &width, uint32_t &height, uint8_t &channels, uint8_t &co
         QoiWriteU8(g);
         QoiWriteU8(b);
         if (channels == 4) QoiWriteU8(a);
+
+        pre_r = r; pre_g = g; pre_b = b; pre_a = a;
     }
 
     bool valid = true;
